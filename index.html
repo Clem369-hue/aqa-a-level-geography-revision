@@ -99,6 +99,20 @@ html[data-theme="light"] .ann-judgement{background:#ffe1dc;color:#622c26}
 .smart-task-dialog::backdrop{background:#000c}.st-head,.st-spread{display:flex;justify-content:space-between;align-items:flex-start;gap:1rem}.st-card{background:#20292f;border:1px solid var(--line);border-radius:14px;padding:1rem;margin-top:.9rem}.st-task-name{font-size:1.45rem;font-weight:800;margin:.35rem 0}.st-reasons{margin:.75rem 0;padding-left:1.2rem}.st-reasons li{margin:.35rem 0}.st-actions{display:flex;gap:.55rem;flex-wrap:wrap;margin-top:1rem}.st-primary{background:var(--teal)!important;color:#082522!important;border-color:var(--teal)!important}.st-pill{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:.18rem .6rem;color:var(--muted);font-size:.8rem}
 @media(max-width:700px){.smart-task-dialog{width:100vw;max-width:none;margin:0;border-radius:0}.st-actions{display:grid;grid-template-columns:1fr}.st-actions button{min-height:48px}}
 
+
+/* Geography NEA Statistics Assistant */
+.nea-intro{border-left:3px solid var(--teal);padding:.85rem 1rem;background:var(--panel);margin:.8rem 0}
+.nea-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.8rem}
+.nea-result{border:1px solid var(--line);border-radius:12px;padding:1rem;background:var(--panel);margin-top:1rem}
+.nea-result strong.big{display:block;font-size:1.65rem;color:var(--teal);margin-bottom:.35rem}
+.nea-table{width:100%;border-collapse:collapse;margin:.8rem 0;font-size:.9rem}
+.nea-table th,.nea-table td{border:1px solid var(--line);padding:.5rem;text-align:right}
+.nea-table th:first-child,.nea-table td:first-child{text-align:left}
+.nea-good{border-left:3px solid var(--good);padding:.7rem .9rem;background:var(--panel)}
+.nea-warn{border-left:3px solid var(--amber);padding:.7rem .9rem;background:var(--panel)}
+.nea-copy{white-space:pre-wrap;border:1px dashed var(--line);border-radius:10px;padding:.8rem;background:var(--panel)}
+@media(max-width:760px){.nea-grid{grid-template-columns:1fr}.nea-table{font-size:.8rem}}
+
 </style>
 <link rel="manifest" href="./manifest.webmanifest">\n</head>
 <body>
@@ -113,6 +127,7 @@ html[data-theme="light"] .ann-judgement{background:#ffe1dc;color:#622c26}
  <button type="button" data-utility="theme" id="theme-toggle">Light mode <span aria-hidden="true">T</span></button>
  <button type="button" data-utility="shortcuts">Shortcuts <span aria-hidden="true">?</span></button>
  <button type="button" id="smart-task-launch" class="smart-task-launch">Smart Next Task <span aria-hidden="true">N</span></button>
+ <button type="button" id="nea-stats-launch">NEA Stats</button>
  <button type="button" id="performance-launch">Performance</button>
 <span class="utility-hint">Keyboard shortcuts available</span>
 </div>
@@ -918,6 +933,7 @@ document.addEventListener("keydown",function(ev){
   <button type="button" data-ph-tab="cards">Custom flashcards</button>
   <button type="button" data-ph-tab="bulk">Bulk flashcards</button>
   <button type="button" data-ph-tab="annotate">Annotate answer</button>
+  <button type="button" data-ph-tab="nea">NEA Statistics</button>
   <button type="button" data-ph-tab="history">Question history</button>
  </nav>
  <div id="ph-content"></div>
@@ -926,10 +942,10 @@ document.addEventListener("keydown",function(ev){
 (function(){
 "use strict";
 var KIND="geo",SMART_KEY="aqa-geo-smart-v1",PLUS_KEY="aqa-geo-plus-v1",LAB_KEY="aqa-geo-study-lab-v1",CUSTOM_KEY="aqa-geo-custom-cards-v1",PERF_KEY="aqa-geo-performance-v1";
-var perf={paragraphs:[],questions:[],annotations:[]},tab="analytics",para={topic:null,type:"Main paragraph",minutes:8,left:480,running:false,interval:null,q:""},retryId=null,bulkSuggestions=[],bulkTopic=null,bulkResourceId="",bulkPaste="",bulkCount=10,annotationDraft="",annotationSegments=[];
+var perf={paragraphs:[],questions:[],annotations:[],neaStats:{}},tab="analytics",para={topic:null,type:"Main paragraph",minutes:8,left:480,running:false,interval:null,q:""},retryId=null,bulkSuggestions=[],bulkTopic=null,bulkResourceId="",bulkPaste="",bulkCount=10,annotationDraft="",annotationSegments=[],neaTest="spearman";
 function esc(v){return String(v==null?"":v).replace(/[&<>"']/g,function(c){return({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c];});}
 function read(k,d){try{var x=JSON.parse(localStorage.getItem(k)||"null");return x&&typeof x==="object"?x:d;}catch(e){return d;}}
-function load(){var x=read(PERF_KEY,null);if(x){perf.paragraphs=Array.isArray(x.paragraphs)?x.paragraphs:[];perf.questions=Array.isArray(x.questions)?x.questions:[];perf.annotations=Array.isArray(x.annotations)?x.annotations:[];}seedHistory();}
+function load(){var x=read(PERF_KEY,null);if(x){perf.paragraphs=Array.isArray(x.paragraphs)?x.paragraphs:[];perf.questions=Array.isArray(x.questions)?x.questions:[];perf.annotations=Array.isArray(x.annotations)?x.annotations:[];perf.neaStats=x.neaStats||{};neaTest=perf.neaStats.lastTest||"spearman";}seedHistory();}
 function save(){try{localStorage.setItem(PERF_KEY,JSON.stringify(perf));}catch(e){}}
 function topics(){if(KIND==="geo")return Object.keys(U).map(function(id){return{id:id,title:U[id].title};});return TOPICS.map(function(t){return{id:t.id,title:t.title};});}
 function title(id){var t=topics().find(function(x){return x.id===id;});return t?t.title:id;}
@@ -1045,16 +1061,106 @@ function annotationView(){
  var feedback=[];if(annotationSegments.length){if(!counts.Evidence)feedback.push("Add precise "+(KIND==="geo"?"case-study data/evidence":"scholars, quotations or source material"));if(!counts.Analysis)feedback.push("develop reasoning with because/therefore links");if(!counts.Evaluation)feedback.push("include counterargument or weighing");if(!counts.Judgement)feedback.push("make an explicit justified judgement");}
  return'<section class="ph-box"><h3>Answer annotation mode</h3><p class="muted">Paste an answer and the site will colour-code each sentence. You can correct any category manually to see whether the answer is balanced.</p><label>Answer<textarea id="annotation-text" placeholder="Paste an essay, paragraph or mock answer...">'+esc(annotationDraft)+'</textarea></label><div class="ph-actions"><button type="button" id="annotation-run" class="ph-primary">Annotate answer</button>'+(annotationSegments.length?'<button type="button" id="annotation-save">Save annotation snapshot</button>':'')+'</div><div class="ph-annotation-legend">'+cats.map(function(c){return'<span class="'+annotationClass(c)+'">'+c+' · '+(counts[c]||0)+'</span>';}).join("")+'</div>'+(annotationSegments.length?'<div class="ph-annotation-preview">'+annotationSegments.map(function(x){return'<span class="'+annotationClass(x.cat)+'">'+esc(x.text)+'</span> ';}).join("")+'</div><div class="ph-annotation-list">'+annotationSegments.map(function(x,i){return'<div class="ph-annotation-row"><select data-annotation-cat="'+i+'">'+cats.map(function(c){return'<option '+(c===x.cat?"selected":"")+'>'+c+'</option>';}).join("")+'</select><p>'+esc(x.text)+'</p></div>';}).join("")+'</div><div class="ph-result"><strong>Balance check:</strong> '+(feedback.length?esc(feedback.join("; "))+".":"All five exam-function categories are represented. Check that evidence is explained and evaluation actually weighs the argument.")+'</div>':'')+'</section>';
 }
+
+function neaNums(v){
+ return String(v||"").trim().split(/[\s,;]+/).filter(Boolean).map(Number).filter(function(x){return Number.isFinite(x);});
+}
+function neaRanks(vals){
+ var order=vals.map(function(v,i){return{v:v,i:i};}).sort(function(a,b){return a.v-b.v;}),r=new Array(vals.length),p=0;
+ while(p<order.length){var q=p+1;while(q<order.length&&order[q].v===order[p].v)q++;var av=((p+1)+q)/2;for(var j=p;j<q;j++)r[order[j].i]=av;p=q;}
+ return r;
+}
+function neaPearson(a,b){
+ var n=a.length,ma=a.reduce(function(x,y){return x+y;},0)/n,mb=b.reduce(function(x,y){return x+y;},0)/n,num=0,da=0,db=0;
+ for(var i=0;i<n;i++){var x=a[i]-ma,y=b[i]-mb;num+=x*y;da+=x*x;db+=y*y;}
+ return da&&db?num/Math.sqrt(da*db):NaN;
+}
+function neaSpearmanCritical(n){
+ var t={5:.900,6:.829,7:.714,8:.643,9:.600,10:.564,11:.536,12:.503,13:.484,14:.464,15:.446,16:.429,17:.414,18:.401,19:.391,20:.380,21:.370,22:.361,23:.353,24:.344,25:.337,26:.330,27:.324,28:.317,29:.312,30:.306};
+ return t[n]||1.96/Math.sqrt(Math.max(1,n-1));
+}
+function neaSpearman(x,y){
+ if(x.length!==y.length||x.length<5)throw Error("Enter the same number of paired values in X and Y, with at least 5 pairs.");
+ var rx=neaRanks(x),ry=neaRanks(y),rho=neaPearson(rx,ry),crit=neaSpearmanCritical(x.length),sig=Math.abs(rho)>=crit;
+ return{test:"Spearman’s rank",n:x.length,stat:rho,critical:crit,significant:sig,alpha:.05,
+ nullHyp:"There is no statistically significant correlation between the two variables.",
+ assumptions:["Paired observations","Variables are at least ordinal","The relationship is monotonic rather than necessarily linear"],
+ writeup:"I used Spearman’s rank correlation because I was testing for an association between two paired ordinal/continuous variables. The calculated Spearman’s rho was "+rho.toFixed(3)+". At the 0.05 significance level, the approximate two-tailed critical value for n = "+x.length+" is "+crit.toFixed(3)+". Because |rho| "+(sig?"exceeds":"does not exceed")+" the critical value, the result is "+(sig?"statistically significant and the null hypothesis can be rejected.":"not statistically significant, so there is insufficient evidence to reject the null hypothesis.")};
+}
+function neaErf(x){
+ var sign=x<0?-1:1;x=Math.abs(x);var a1=.254829592,a2=-.284496736,a3=1.421413741,a4=-1.453152027,a5=1.061405429,p=.3275911,t=1/(1+p*x);
+ return sign*(1-(((((a5*t+a4)*t)+a3)*t+a2)*t+a1)*t*Math.exp(-x*x));
+}
+function neaPhi(z){return .5*(1+neaErf(z/Math.sqrt(2)));}
+function neaMannWhitney(a,b){
+ if(a.length<3||b.length<3)throw Error("Enter at least 3 observations in each independent group.");
+ var all=a.map(function(v){return{v:v,g:0};}).concat(b.map(function(v){return{v:v,g:1};})).sort(function(x,y){return x.v-y.v;}),ranks=new Array(all.length),ties=[],p=0;
+ while(p<all.length){var q=p+1;while(q<all.length&&all[q].v===all[p].v)q++;var av=((p+1)+q)/2;for(var j=p;j<q;j++)ranks[j]=av;if(q-p>1)ties.push(q-p);p=q;}
+ var r1=0,r2=0;all.forEach(function(x,i){if(x.g===0)r1+=ranks[i];else r2+=ranks[i];});
+ var n1=a.length,n2=b.length,N=n1+n2,u1=r1-n1*(n1+1)/2,u2=r2-n2*(n2+1)/2,U=Math.min(u1,u2),mean=n1*n2/2;
+ var tieSum=ties.reduce(function(n,t){return n+(t*t*t-t);},0),variance=n1*n2/12*((N+1)-(N>1?tieSum/(N*(N-1)):0));
+ var z=variance>0?(Math.abs(U-mean)-.5)/Math.sqrt(variance):0;if(z<0)z=0;var pv=2*(1-neaPhi(Math.abs(z))),sig=pv<.05;
+ return{test:"Mann–Whitney U",n:n1+n2,stat:U,z:z,p:pv,significant:sig,alpha:.05,
+ nullHyp:"There is no statistically significant difference between the distributions of the two independent groups.",
+ assumptions:["Two independent groups","Data are at least ordinal","Observations are independent","Similar distribution shapes are preferable when interpreting the result as a difference in medians"],
+ writeup:"I used a Mann–Whitney U test because I was comparing two independent groups using ordinal/continuous data without assuming normality. The smaller U value was "+U.toFixed(2)+". Using a normal approximation with tie and continuity correction, z = "+z.toFixed(3)+" and p ≈ "+pv.toFixed(4)+". At α = 0.05, this result is "+(sig?"statistically significant, so the null hypothesis can be rejected.":"not statistically significant, so there is insufficient evidence to reject the null hypothesis.")+" For a very small sample, I would also check the exact critical value using a statistical table or approved software."};
+}
+function neaParseMatrix(v){
+ var rows=String(v||"").trim().split(/\n+/).map(function(r){return r.trim().split(/[\s,;]+/).filter(Boolean).map(Number);}).filter(function(r){return r.length;});
+ if(rows.length<2)throw Error("Enter at least 2 rows of observed frequencies.");
+ var cols=rows[0].length;if(cols<2||rows.some(function(r){return r.length!==cols||r.some(function(x){return !Number.isFinite(x)||x<0;});}))throw Error("Use a rectangular table of non-negative observed frequency counts, with the same number of columns in every row.");
+ return rows;
+}
+function neaChiCritical(df){
+ var t={1:3.841,2:5.991,3:7.815,4:9.488,5:11.070,6:12.592,7:14.067,8:15.507,9:16.919,10:18.307,11:19.675,12:21.026,13:22.362,14:23.685,15:24.996,16:26.296,17:27.587,18:28.869,19:30.144,20:31.410};
+ return t[df]||null;
+}
+function neaChiSquare(m){
+ var R=m.length,C=m[0].length,row=m.map(function(r){return r.reduce(function(a,b){return a+b;},0);}),col=new Array(C).fill(0);
+ for(var i=0;i<R;i++)for(var j=0;j<C;j++)col[j]+=m[i][j];
+ var total=row.reduce(function(a,b){return a+b;},0);if(total<=0)throw Error("The table must contain at least one observation.");
+ var expected=[],chi=0,small=0,under1=0;
+ for(var i=0;i<R;i++){expected[i]=[];for(var j=0;j<C;j++){var ex=row[i]*col[j]/total;expected[i][j]=ex;if(ex<5)small++;if(ex<1)under1++;if(ex>0)chi+=(m[i][j]-ex)*(m[i][j]-ex)/ex;}}
+ var df=(R-1)*(C-1),crit=neaChiCritical(df),sig=crit!==null?chi>=crit:null,cells=R*C,assumption=(under1===0&&small/cells<=.2);
+ return{test:"Chi-squared test of association",n:total,stat:chi,df:df,critical:crit,significant:sig,alpha:.05,expected:expected,assumptionOK:assumption,
+ nullHyp:"There is no statistically significant association between the two categorical variables.",
+ assumptions:["Observed data are frequency counts","Categories are mutually exclusive","Observations are independent","Expected frequencies should generally not be too small"],
+ writeup:"I used a chi-squared test because I was testing for an association between two categorical variables using frequency data. The calculated χ² value was "+chi.toFixed(3)+" with "+df+" degree"+(df===1?"":"s")+" of freedom."+(crit!==null?" At α = 0.05, the critical value is "+crit.toFixed(3)+". Because χ² "+(sig?"exceeds":"does not exceed")+" the critical value, the result is "+(sig?"statistically significant and the null hypothesis can be rejected.":"not statistically significant, so there is insufficient evidence to reject the null hypothesis."):" The built-in critical-value table covers up to 20 degrees of freedom, so this result should be checked with statistical software.")+(assumption?"":" Some expected frequencies are small, so the chi-squared approximation may be unreliable and categories may need combining where geographically and conceptually justified.")};
+}
+function neaExpectedTable(ex){
+ if(!ex)return"";return'<table class="nea-table"><thead><tr><th>Expected counts</th>'+ex[0].map(function(_,i){return'<th>Col '+(i+1)+'</th>';}).join("")+'</tr></thead><tbody>'+ex.map(function(r,i){return'<tr><th>Row '+(i+1)+'</th>'+r.map(function(x){return'<td>'+x.toFixed(2)+'</td>';}).join("")+'</tr>';}).join("")+'</tbody></table>';
+}
+function neaResultHtml(r){
+ var sigText=r.significant===null?"Check with statistical software":r.significant?"Statistically significant at 5%":"Not statistically significant at 5%";
+ return'<div class="nea-result"><strong class="big">'+stEscSafe(r.test)+'</strong><p><strong>Result:</strong> '+(r.test.indexOf("Spearman")>=0?"ρ = "+r.stat.toFixed(3):r.test.indexOf("Mann")>=0?"U = "+r.stat.toFixed(2)+" · z ≈ "+r.z.toFixed(3)+" · p ≈ "+r.p.toFixed(4):"χ² = "+r.stat.toFixed(3)+" · df = "+r.df)+'</p><p><strong>Decision:</strong> '+stEscSafe(sigText)+'</p><p><strong>Null hypothesis:</strong> '+stEscSafe(r.nullHyp)+'</p>'+(r.expected?neaExpectedTable(r.expected):'')+'<h3>Assumptions / checks</h3><ul>'+r.assumptions.map(function(x){return'<li>'+stEscSafe(x)+'</li>';}).join("")+'</ul>'+(r.assumptionOK===false?'<div class="nea-warn"><strong>Warning:</strong> Some expected counts are small, so interpret the chi-squared result cautiously.</div>':'<div class="nea-good"><strong>Use in your NEA:</strong> explain why this test fits your variables, state the null hypothesis, report the statistic, then interpret what it means geographically.</div>')+'<h3>Methodology / analysis wording</h3><div id="nea-writeup" class="nea-copy">'+stEscSafe(r.writeup)+'</div><button type="button" id="nea-copy-writeup">Copy wording</button></div>';
+}
+function stEscSafe(v){return esc(v);}
+function neaRecommendation(){
+ var aim=document.getElementById("nea-aim")?.value||"relationship",data=document.getElementById("nea-data")?.value||"numeric",groups=document.getElementById("nea-groups")?.value||"two";
+ if(aim==="association"||data==="categorical")return{test:"chi",why:"You are testing whether two categorical variables are associated, so chi-squared is the appropriate built-in test."};
+ if(aim==="difference"&&groups==="two")return{test:"mann",why:"You are comparing two independent groups using ordinal/continuous data, so Mann–Whitney U is suitable."};
+ if(aim==="relationship"&&(data==="numeric"||data==="ordinal"))return{test:"spearman",why:"You are testing the strength and direction of a relationship between paired ordinal/continuous variables, so Spearman’s rank is suitable."};
+ return{test:"spearman",why:"None of the three built-in tests perfectly matches those choices. Check your sampling design and variable type; Spearman is shown as a starting point."};
+}
+function neaInputs(){
+ if(neaTest==="spearman")return'<div class="nea-grid"><label>Variable X<textarea id="nea-x" placeholder="e.g. 22, 18, 15, 11, 9"></textarea></label><label>Variable Y<textarea id="nea-y" placeholder="e.g. 86, 72, 54, 31, 25"></textarea></label></div><p class="small muted">Enter paired values in the same order. Average ranks are used automatically for ties.</p>';
+ if(neaTest==="mann")return'<div class="nea-grid"><label>Group A<textarea id="nea-a" placeholder="e.g. regenerated sites: 22, 20, 18, 19"></textarea></label><label>Group B<textarea id="nea-b" placeholder="e.g. less-regenerated sites: 11, 13, 9, 12"></textarea></label></div><p class="small muted">Use independent observations. The calculator uses a normal approximation with tie and continuity correction.</p>';
+ return'<label>Observed frequency table<textarea id="nea-matrix" placeholder="Example 2 × 3 table:\n18, 12, 5\n8, 15, 17"></textarea></label><p class="small muted">Each line is a row; separate frequency counts with commas or spaces.</p>';
+}
+function neaView(){
+ var last=perf.neaStats&&perf.neaStats.lastResult;
+ return'<section class="ph-box"><h3>NEA Statistics Assistant</h3><div class="nea-intro"><strong>Use statistics to support, not replace, geographical interpretation.</strong><p class="small muted">This tool helps select and calculate common NEA tests. Check your final method and significance decision against your teacher, textbook or approved statistical software, especially with very small samples.</p></div><h3>1. Choose the test</h3><div class="nea-grid"><label>What are you testing?<select id="nea-aim"><option value="relationship">Relationship / correlation</option><option value="difference">Difference between groups</option><option value="association">Association between categories</option></select></label><label>What type of data?<select id="nea-data"><option value="numeric">Continuous / numeric</option><option value="ordinal">Ordinal / ranked</option><option value="categorical">Categorical frequencies</option></select></label><label>Groups<select id="nea-groups"><option value="two">Two independent groups</option><option value="paired">Paired observations</option><option value="categories">Categories / contingency table</option></select></label></div><div class="ph-actions"><button type="button" id="nea-recommend" class="ph-primary">Recommend a test</button></div><div id="nea-recommendation"></div><h3>2. Calculate</h3><label>Statistical test<select id="nea-test"><option value="spearman" '+(neaTest==="spearman"?"selected":"")+'>Spearman’s rank correlation</option><option value="mann" '+(neaTest==="mann"?"selected":"")+'>Mann–Whitney U</option><option value="chi" '+(neaTest==="chi"?"selected":"")+'>Chi-squared test</option></select></label><div id="nea-inputs">'+neaInputs()+'</div><button type="button" id="nea-calculate" class="ph-primary">Calculate & interpret</button><div id="nea-result">'+(last?'<p class="small muted">Your last NEA statistics result is saved in this browser and included in your backup/sync data.</p>':'')+'</div></section>';
+}
 function historyView(){var rows=perf.questions.slice().sort(function(a,b){return b.last-a.last;});return'<section class="ph-box"><div class="ph-spread"><div><h3>Question history</h3><p class="muted">Generated and attempted exam questions are saved here so you can avoid repeating the same ones too often.</p></div><span class="ph-tag">'+rows.length+' saved</span></div><div class="ph-grid"><label>Search<input id="history-search" type="search" placeholder="Search questions or topics"></label><label>Status<select id="history-status"><option value="all">All questions</option><option value="attempted">Attempted</option><option value="unattempted">Not attempted</option></select></label></div><div id="history-results" class="ph-history">'+historyRows(rows)+'</div></section>';}
 function historyRows(rows){return rows.length?rows.slice(0,100).map(function(x){return'<article><div class="ph-spread"><div><span class="ph-tag">'+esc(x.source||"Practice")+'</span> '+(x.marks?'<span class="ph-tag">'+x.marks+' marks</span>':'')+(x.retryDue?'<span class="ph-tag '+(x.retryDue<=Date.now()?"ph-due":"")+'">'+esc(dueText(x.retryDue))+'</span>':'')+'</div><span class="ph-tag">'+(x.attempted?"Attempted":"Not attempted")+'</span></div><h3>'+esc(x.q)+'</h3><p class="muted small">'+esc(title(x.topic||""))+' · seen '+(x.seen||1)+' time'+((x.seen||1)===1?"":"s")+(Number.isFinite(x.score)?" · last score "+x.score+"%":"")+'</p><div class="ph-actions"><button type="button" data-retry-open="'+esc(x.id)+'">Retry now</button><button type="button" data-retry-schedule="'+esc(x.id)+'">Schedule tomorrow</button></div></article>';}).join(""):'<p class="muted">No questions saved yet. Generated exam questions and timed-paragraph prompts will appear here.</p>';}
 function filterHistory(){var q=(document.getElementById("history-search")?.value||"").toLowerCase(),st=document.getElementById("history-status")?.value||"all",rows=perf.questions.filter(function(x){var hit=!q||(x.q+" "+title(x.topic||"")+" "+(x.source||"")).toLowerCase().includes(q),status=st==="all"||(st==="attempted"&&x.attempted)||(st==="unattempted"&&!x.attempted);return hit&&status;}).sort(function(a,b){return b.last-a.last;});var out=document.getElementById("history-results");if(out)out.innerHTML=historyRows(rows);}
-function render(){document.querySelectorAll("[data-ph-tab]").forEach(function(b){b.setAttribute("aria-pressed",String(b.dataset.phTab===tab));});document.getElementById("ph-content").innerHTML=tab==="analytics"?analytics():tab==="paragraph"?paragraphView():tab==="retry"?retryView():tab==="cards"?cardsView():tab==="bulk"?bulkView():tab==="annotate"?annotationView():historyView();}
+function render(){document.querySelectorAll("[data-ph-tab]").forEach(function(b){b.setAttribute("aria-pressed",String(b.dataset.phTab===tab));});document.getElementById("ph-content").innerHTML=tab==="analytics"?analytics():tab==="paragraph"?paragraphView():tab==="retry"?retryView():tab==="cards"?cardsView():tab==="bulk"?bulkView():tab==="annotate"?annotationView():tab==="nea"?neaView():historyView();}
 function open(){render();var d=document.getElementById("performance-dialog");if(d.showModal)d.showModal();else d.setAttribute("open","");}
 function close(){var d=document.getElementById("performance-dialog");if(d.close)d.close();else d.removeAttribute("open");}
 load();
-document.getElementById("performance-launch")?.addEventListener("click",open);document.getElementById("ph-close").addEventListener("click",close);
+document.getElementById("performance-launch")?.addEventListener("click",open);document.getElementById("nea-stats-launch")?.addEventListener("click",function(){tab="nea";open();});document.getElementById("ph-close").addEventListener("click",close);
 document.getElementById("performance-dialog").addEventListener("input",function(ev){if(ev.target.id==="history-search")filterHistory();if(ev.target.id==="annotation-text")annotationDraft=ev.target.value;if(ev.target.id==="bulk-text")bulkPaste=ev.target.value;});
-document.getElementById("performance-dialog").addEventListener("change",function(ev){if(ev.target.id==="para-topic"){para.topic=ev.target.value;para.q=makeParagraphQuestion();render();}if(ev.target.id==="para-type"){para.type=ev.target.value;para.q=makeParagraphQuestion();render();}if(ev.target.id==="para-minutes"){para.minutes=Number(ev.target.value);para.left=para.minutes*60;render();}if(ev.target.id==="history-status")filterHistory();if(ev.target.id==="bulk-resource"){bulkResourceId=ev.target.value;var r=teacherResources().find(function(x){return x.id===bulkResourceId;});bulkPaste=r?r.text:"";var ta=document.getElementById("bulk-text");if(ta)ta.value=bulkPaste;}if(ev.target.id==="bulk-topic"){bulkTopic=ev.target.value;}if(ev.target.id==="bulk-count"){bulkCount=Number(ev.target.value)||10;}if(ev.target.matches("[data-annotation-cat]")){var i=Number(ev.target.dataset.annotationCat);if(annotationSegments[i]){annotationSegments[i].cat=ev.target.value;render();}}});
+document.getElementById("performance-dialog").addEventListener("change",function(ev){if(ev.target.id==="para-topic"){para.topic=ev.target.value;para.q=makeParagraphQuestion();render();}if(ev.target.id==="para-type"){para.type=ev.target.value;para.q=makeParagraphQuestion();render();}if(ev.target.id==="para-minutes"){para.minutes=Number(ev.target.value);para.left=para.minutes*60;render();}if(ev.target.id==="history-status")filterHistory();if(ev.target.id==="bulk-resource"){bulkResourceId=ev.target.value;var r=teacherResources().find(function(x){return x.id===bulkResourceId;});bulkPaste=r?r.text:"";var ta=document.getElementById("bulk-text");if(ta)ta.value=bulkPaste;}if(ev.target.id==="bulk-topic"){bulkTopic=ev.target.value;}if(ev.target.id==="bulk-count"){bulkCount=Number(ev.target.value)||10;}if(ev.target.matches("[data-annotation-cat]")){var i=Number(ev.target.dataset.annotationCat);if(annotationSegments[i]){annotationSegments[i].cat=ev.target.value;render();}}if(ev.target.id==="nea-test"){neaTest=ev.target.value;perf.neaStats=perf.neaStats||{};perf.neaStats.lastTest=neaTest;save();var box=document.getElementById("nea-inputs");if(box)box.innerHTML=neaInputs();}});
 document.getElementById("performance-dialog").addEventListener("click",function(ev){
  var b=ev.target.closest("button");if(!b)return;
  if(b.dataset.phTab){tab=b.dataset.phTab;render();return;}
@@ -1071,6 +1177,9 @@ document.getElementById("performance-dialog").addEventListener("click",function(
  if(b.id==="bulk-add-selected"){var topic=bulkTopic||document.getElementById("bulk-topic")?.value||topics()[0].id,cs=customCards(),added=0;document.querySelectorAll("[data-bulk-check]:checked").forEach(function(ch){var i=Number(ch.dataset.bulkCheck),front=document.querySelector('[data-bulk-front="'+i+'"]'),back=document.querySelector('[data-bulk-back="'+i+'"]'),q=front?front.value.trim():"",a=back?back.value.trim():"";if(q&&a&&!cs.some(function(c){return c.q.toLowerCase()===q.toLowerCase()&&c.a.toLowerCase()===a.toLowerCase();})){cs.push({id:"bulk-"+Date.now()+"-"+i+"-"+Math.random().toString(36).slice(2,5),topic:topic,title:title(topic),q:q,a:a,created:Date.now(),source:"Bulk generator"});added++;}});try{localStorage.setItem(CUSTOM_KEY,JSON.stringify(cs));}catch(e){}bulkSuggestions=[];render();setTimeout(function(){var out=document.getElementById("bulk-output");if(out)out.innerHTML='<div class="ph-result"><strong>'+added+' card'+(added===1?"":"s")+' added to spaced repetition.</strong></div>';},0);return;}
  if(b.id==="annotation-run"){buildAnnotation(document.getElementById("annotation-text").value);render();return;}
  if(b.id==="annotation-save"){var counts=annotationCounts();perf.annotations.unshift({at:Date.now(),text:annotationDraft,segments:annotationSegments.map(function(x){return{text:x.text,cat:x.cat};}),counts:counts});perf.annotations=perf.annotations.slice(0,30);save();b.textContent="Saved ✓";b.disabled=true;return;}
+ if(b.id==="nea-recommend"){var r=neaRecommendation();neaTest=r.test;perf.neaStats=perf.neaStats||{};perf.neaStats.lastTest=neaTest;save();var sel=document.getElementById("nea-test");if(sel)sel.value=neaTest;var inp=document.getElementById("nea-inputs");if(inp)inp.innerHTML=neaInputs();var out=document.getElementById("nea-recommendation");if(out)out.innerHTML='<div class="nea-good"><strong>Recommended:</strong> '+(neaTest==="spearman"?"Spearman’s rank":neaTest==="mann"?"Mann–Whitney U":"Chi-squared")+'<br>'+esc(r.why)+'</div>';return;}
+ if(b.id==="nea-calculate"){try{var r;if(neaTest==="spearman")r=neaSpearman(neaNums(document.getElementById("nea-x").value),neaNums(document.getElementById("nea-y").value));else if(neaTest==="mann")r=neaMannWhitney(neaNums(document.getElementById("nea-a").value),neaNums(document.getElementById("nea-b").value));else r=neaChiSquare(neaParseMatrix(document.getElementById("nea-matrix").value));perf.neaStats=perf.neaStats||{};perf.neaStats.lastTest=neaTest;perf.neaStats.lastResult={at:Date.now(),test:r.test,stat:r.stat,significant:r.significant,writeup:r.writeup};save();document.getElementById("nea-result").innerHTML=neaResultHtml(r);}catch(err){document.getElementById("nea-result").innerHTML='<div class="nea-warn"><strong>Check your data:</strong> '+esc(err.message||String(err))+'</div>';}return;}
+ if(b.id==="nea-copy-writeup"){var text=document.getElementById("nea-writeup")?.textContent||"";if(navigator.clipboard)navigator.clipboard.writeText(text).catch(function(){});b.textContent="Copied ✓";return;}
 });
 document.addEventListener("click",function(ev){var b=ev.target.closest("button");if(!b)return;setTimeout(function(){try{
  if(b.id==="sr-generate"||b.id==="sr-new-question"){var q=document.querySelector("#smart-revision-dialog .sr-question h3");if(q)logQuestion(q.textContent,"","Exam generator",null,false,null);}

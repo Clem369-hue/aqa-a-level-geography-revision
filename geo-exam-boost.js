@@ -3,7 +3,7 @@
 "use strict";
 if(typeof U==="undefined"||!window.__aqaSmart)return;
 const KEY="aqa-geo-exam-boost-v1";
-const esc=v=>String(v==null?"":v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]);
+const esc=v=>String(v==null?"":v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const read=()=>{try{return JSON.parse(localStorage.getItem(KEY)||"{}")||{};}catch(e){return{};}};
 let st=Object.assign({gapRuns:[],caseRight:0,caseWrong:0,ao3Done:{},mapDone:{}},read());
 const save=()=>{try{if(window.__aqaStore)window.__aqaStore(KEY,JSON.stringify(st));else localStorage.setItem(KEY,JSON.stringify(st));}catch(e){}};
